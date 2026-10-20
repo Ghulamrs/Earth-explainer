@@ -127,6 +127,7 @@ int main() {
 
         Scene s;
         CVector<3> contact = s.frame2().origin();
+        CVector<3> where[3] = { qx.rotate(contact), (qy * qx).rotate(contact), (qy * qx).rotate(contact) };
         for (int k = 0; k < 3; ++k) {
             CHECK(s.turnFrame2());
             CHECK(!s.turnFrame2());
@@ -137,8 +138,10 @@ int main() {
             CHECK(!s.isTurningFrame2());
             CRotrix got(s.frame2().pose().orientation), want(expected[k]);
             for (int i = 0; i < 3; ++i) CHECK(near(got[i], want[i], 1e-12));
-            CHECK(near(s.frame2().origin(), contact, 1e-12));
+            CHECK(near(s.frame2().origin(), where[k], 1e-12));
+            CHECK(near(distance(s.frame2().origin(), s.frame1().origin()), Scene::kEarthRadius, 1e-12));
         }
+        CHECK(near(where[0], CVector<3>(0, std::sin(74 * deg), -std::cos(74 * deg)), 1e-12));
         CHECK(s.frame2TurnsStarted() == Scene::kFrame2TurnCount);
         CHECK(!s.turnFrame2());
         CHECK(!s.needsFrames());

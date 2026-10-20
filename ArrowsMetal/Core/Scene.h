@@ -73,7 +73,7 @@ private:
     int            turnsStarted_;
     bool           turning_;
     double         turnProgress_;
-    CQuat          turnBase_;
+    RigidTransform turnBase_;
 
     void rebuildCamera();
     void motion(CVector<3>& spin, CVector<3>& move) const;

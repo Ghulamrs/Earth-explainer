@@ -91,7 +91,7 @@ void Scene::motion(CVector<3>& spin, CVector<3>& move) const {
 
 bool Scene::turnFrame2() {
     if (turning_ || turnsStarted_ == kFrame2TurnCount) return false;
-    turnBase_     = frame2_.pose().orientation;
+    turnBase_     = frame2_.pose();
     turnProgress_ = 0.0;
     turning_      = true;
     ++turnsStarted_;
@@ -105,7 +105,8 @@ void Scene::advanceTurn(double dt) {
     double e = turnProgress_ * turnProgress_ * (3.0 - 2.0 * turnProgress_);
     const Turn& t = kFrame2Turns[turnsStarted_ - 1];
     CQuat dq = CQuat::fromAxisAngle(t.axis, t.degrees * 3.14159265358979323846 / 180.0 * e);
-    frame2_.setOrientation(t.ownAxis ? turnBase_ * dq : dq * turnBase_);
+    if (t.ownAxis) frame2_.setPose(turnBase_.orientation * dq, turnBase_.position);
+    else           frame2_.setPose(dq * turnBase_.orientation, dq.rotate(turnBase_.position));
 }
 
 bool Scene::update(double dt) {
