@@ -10,18 +10,24 @@ const double Scene::kFrame2Scale   = 0.4;
 const double Scene::kTurnSeconds   = 1.2;
 
 namespace {
+enum TurnMode { OwnAxis, ParentAxisThroughOrigin };
+
 struct Turn {
+    int        frame;
+    TurnMode   mode;
     CVector<3> axis;
     double     degrees;
-    bool       ownAxis;
 };
 
 const Turn kFrame2Turns[Scene::kFrame2TurnCount] = {
-    { CVector<3>(1, 0, 0),  74.0, false },
-    { CVector<3>(0, 1, 0), -34.0, false },
-    { CVector<3>(0, 0, 1),  35.0, true  },
+    { 1, OwnAxis,                 CVector<3>(1, 0, 0),  74.0 },
+    { 2, ParentAxisThroughOrigin, CVector<3>(0, 1, 0), -34.0 },
+    { 2, OwnAxis,                 CVector<3>(0, 0, 1),  35.0 },
 };
+
+double radiansOf(const Turn& t) { return t.degrees * 3.14159265358979323846 / 180.0; }
 }
+
 
 static const CVector<3> kViewerUp(1, 0, 0);
 
@@ -29,7 +35,7 @@ Scene::Scene()
     : frame2_(kFrame2Scale), solid_(false), local_(true), morph_(0.0),
       distance_(7.5), aspect_(1.0),
       viewDir_(CVector<3>(0.35, -0.40, -1.0).normalized()),
-      turnsStarted_(0), turning_(false), turnProgress_(0.0) {
+      turnsStarted_(0), turning_(false), turnProgress_(0.0), turnEased_(0.0) {
     frame2_.attachTo(frame1_, CVector<3>(0.0, 0.0, -kEarthRadius));
     clearControls();
     rebuildCamera();
@@ -40,7 +46,10 @@ void Scene::clearControls() {
 }
 
 void Scene::reset() {
+    if (turning_) advanceTurn(kTurnSeconds);
     frame1_.reset();
+    for (int k = 0; k < turnsStarted_; ++k)
+        if (kFrame2Turns[k].frame == 1) frame1_.rotate(kFrame2Turns[k].axis, radiansOf(kFrame2Turns[k]));
     distance_ = 7.5;
     rebuildCamera();
 }
@@ -91,7 +100,7 @@ void Scene::motion(CVector<3>& spin, CVector<3>& move) const {
 
 bool Scene::turnFrame2() {
     if (turning_ || turnsStarted_ == kFrame2TurnCount) return false;
-    turnBase_     = frame2_.pose();
+    turnEased_    = 0.0;
     turnProgress_ = 0.0;
     turning_      = true;
     ++turnsStarted_;
@@ -104,9 +113,11 @@ void Scene::advanceTurn(double dt) {
     if (turnProgress_ >= 1.0) { turnProgress_ = 1.0; turning_ = false; }
     double e = turnProgress_ * turnProgress_ * (3.0 - 2.0 * turnProgress_);
     const Turn& t = kFrame2Turns[turnsStarted_ - 1];
-    CQuat dq = CQuat::fromAxisAngle(t.axis, t.degrees * 3.14159265358979323846 / 180.0 * e);
-    if (t.ownAxis) frame2_.setPose(turnBase_.orientation * dq, turnBase_.position);
-    else           frame2_.setPose(dq * turnBase_.orientation, dq.rotate(turnBase_.position));
+    double step = radiansOf(t) * (e - turnEased_);
+    turnEased_ = e;
+    AxisFrame& f = t.frame == 1 ? frame1_ : frame2_;
+    if (t.mode == OwnAxis) f.rotate(t.axis, step);
+    else                   f.orbit(t.axis, step);
 }
 
 bool Scene::update(double dt) {

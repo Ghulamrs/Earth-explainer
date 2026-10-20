@@ -57,7 +57,7 @@ static NSTextField *label(NSString *text, CGFloat size, NSColor *color) {
                               @"Q/A  W/S  E/D   rotate ±X ±Y ±Z  (hold several to combine)\n"
                               @"hold X Y Z + ←/→   rotate about the held axis (or their sum)\n"
                               @"←/→  ↑/↓  R/F   move   ±X ±Y ±Z\n"
-                              @"Tab  Frame2 turns: X +74°, Y −34°, own Z +35° (one per press)\n"
+                              @"Tab  turns: all +74° about X1;  Frame2 −34° about new Y1;  Frame2 +35° about own Z2\n"
                               @"L  own / world axes    drag  free rotate    scroll  zoom    Space  reset",
                               11, dim);
     help.maximumNumberOfLines = 0;

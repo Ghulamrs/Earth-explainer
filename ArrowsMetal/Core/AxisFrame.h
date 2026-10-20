@@ -19,7 +19,11 @@ public:
     void move(const CVector<3>& delta)                          { pose_.translate(pose_.rotation() * delta); }
     void moveInParent(const CVector<3>& delta)                  { pose_.translate(delta); }
     void reset()                                                { pose_ = home_; }
-    void setPose(const CQuat& q, const CVector<3>& p)           { pose_.orientation = q.normalized(); pose_.position = p; }
+    void orbit(const CVector<3>& axis, double radians) {
+        CQuat dq = CQuat::fromAxisAngle(axis, radians);
+        pose_.orientation = (dq * pose_.orientation).normalized();
+        pose_.position    = dq.rotate(pose_.position);
+    }
 
     const RigidTransform& pose() const { return pose_; }
     double scale() const { return scale_; }

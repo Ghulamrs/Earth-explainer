@@ -11,6 +11,13 @@ static bool near(double a, double b, double tol = 1e-9) { return std::fabs(a - b
 template <int N> static bool near(const CVector<N>& a, const CVector<N>& b, double tol = 1e-9) {
     return (a - b).length() <= tol;
 }
+static bool sameRotation(const CQuat& a, const CQuat& b, double tol = 1e-12) {
+    CRotrix A(a), B(b);
+    for (int i = 0; i < 3; ++i)
+        if (!near(A[i], B[i], tol)) return false;
+    return true;
+}
+
 static CVector<3> transformPoint(const CMatrix<4, 4>& M, const CVector<3>& p) {
     CVector<4> h = M * p.resized<4>(1.0);
     return h.head<3>() / h[3];
@@ -123,11 +130,11 @@ int main() {
         CQuat qx = CQuat::fromAxisAngle(CVector<3>(1, 0, 0),  74 * deg);
         CQuat qy = CQuat::fromAxisAngle(CVector<3>(0, 1, 0), -34 * deg);
         CQuat qz = CQuat::fromAxisAngle(CVector<3>(0, 0, 1),  35 * deg);
-        CQuat expected[3] = { qx, qy * qx, qy * qx * qz };
 
         Scene s;
-        CVector<3> contact = s.frame2().origin();
-        CVector<3> where[3] = { qx.rotate(contact), (qy * qx).rotate(contact), (qy * qx).rotate(contact) };
+        CVector<3> contact = s.frame2().pose().position;
+        CQuat      frame2Rel[3] = { CQuat::identity(), qy, qy * qz };
+        CVector<3> frame2Pos[3] = { contact, qy.rotate(contact), qy.rotate(contact) };
         for (int k = 0; k < 3; ++k) {
             CHECK(s.turnFrame2());
             CHECK(!s.turnFrame2());
@@ -136,20 +143,34 @@ int main() {
             CHECK(s.isTurningFrame2());
             s.update(Scene::kTurnSeconds * 0.5);
             CHECK(!s.isTurningFrame2());
-            CRotrix got(s.frame2().pose().orientation), want(expected[k]);
-            for (int i = 0; i < 3; ++i) CHECK(near(got[i], want[i], 1e-12));
-            CHECK(near(s.frame2().origin(), where[k], 1e-12));
+            CHECK(sameRotation(s.frame1().pose().orientation, qx));
+            CHECK(sameRotation(s.frame2().pose().orientation, frame2Rel[k]));
+            CHECK(near(s.frame2().pose().position, frame2Pos[k], 1e-12));
+            CHECK(near(s.frame2().origin(), qx.rotate(frame2Pos[k]), 1e-12));
             CHECK(near(distance(s.frame2().origin(), s.frame1().origin()), Scene::kEarthRadius, 1e-12));
         }
-        CHECK(near(where[0], CVector<3>(0, std::sin(74 * deg), -std::cos(74 * deg)), 1e-12));
+        CVector<3> newY = qx.rotate(CVector<3>(0, 1, 0));
+        CHECK(near(s.frame1().axis(1), newY, 1e-12));
+        CHECK(near(s.frame2().origin(), CQuat::fromAxisAngle(newY, -34 * deg).rotate(qx.rotate(contact)), 1e-12));
+        for (int i = 0; i < 3; ++i)
+            CHECK(near(s.frame2().axis(i), CRotrix(qx * qy * qz) * CVector<3>::unit(i), 1e-12));
         CHECK(s.frame2TurnsStarted() == Scene::kFrame2TurnCount);
         CHECK(!s.turnFrame2());
         CHECK(!s.needsFrames());
 
-        CVector<3> z2 = s.frame2().axis(2);
-        CHECK(near(z2, CRotrix(qy * qx) * CVector<3>(0, 0, 1), 1e-12));
+        s.setControl(RotYPos, true);
+        s.update(0.3);
+        s.clearControls();
         s.reset();
-        CHECK(near(s.frame2().axis(2), z2, 1e-12));
+        CHECK(sameRotation(s.frame1().pose().orientation, qx));
+        CHECK(sameRotation(s.frame2().pose().orientation, qy * qz));
+
+        Scene r;
+        r.turnFrame2();
+        r.update(Scene::kTurnSeconds * 0.3);
+        r.reset();
+        CHECK(!r.isTurningFrame2());
+        CHECK(sameRotation(r.frame1().pose().orientation, qx));
     }
 
     {

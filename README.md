@@ -38,7 +38,7 @@ placeholder globe is shown.
 | Q/A, W/S, E/D | rotate ±X, ±Y, ±Z (hold several to combine) |
 | hold X / Y / Z + ←/→ | rotate about the held axis; hold two or three for their combined axis |
 | ←/→, ↑/↓, R/F | move ±X, ±Y, ±Z (when no X/Y/Z is held) |
-| Tab | next Frame2 turn: about Frame1's X +74° and Y −34° (through the Earth's centre, so Frame2 travels over the surface), then its own Z +35° (animated, permanent) |
+| Tab | next turn, animated and permanent: 1) Frame1 + Earth + Frame2 +74° about Frame1's X; 2) Frame2 −34° about Frame1's new Y, through the Earth's centre; 3) Frame2 +35° about its own Z |
 | L | Frame1's own axes (default) / world axes |
 | Drag | free rotation |
 | Scroll, pinch | zoom |
