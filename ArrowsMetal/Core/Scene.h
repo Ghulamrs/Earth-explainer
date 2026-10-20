@@ -25,6 +25,8 @@ public:
     static const double kEarthRadius;
     static const double kLabelDistance;
     static const double kFrame2Scale;
+    static const double kTurnSeconds;
+    static const int    kFrame2TurnCount = 3;
 
     Scene();
     Scene(const Scene&) = delete;
@@ -38,6 +40,7 @@ public:
     void zoom(double factor);
     void dragRotate(double dxPixels, double dyUpPixels);
     void setAspect(double aspect);
+    bool turnFrame2();
 
     bool update(double dt);
     bool needsFrames() const;
@@ -50,6 +53,8 @@ public:
     bool   isLocal()    const { return local_; }
     const AxisFrame&      frame1() const { return frame1_; }
     const AxisFrame&      frame2() const { return frame2_; }
+    int                   frame2TurnsStarted() const { return turnsStarted_; }
+    bool                  isTurningFrame2() const { return turning_; }
     const ViewBasis&      cameraBasis() const { return basis_; }
 
     AxisLabel projectAxisLabel(int axis, double viewWidth, double viewHeight, bool earthOpaque) const;
@@ -65,9 +70,14 @@ private:
     CVector<3>     eye_;
     ViewBasis      basis_;
     CMatrix<4, 4>  viewProj_;
+    int            turnsStarted_;
+    bool           turning_;
+    double         turnProgress_;
+    CQuat          turnBase_;
 
     void rebuildCamera();
     void motion(CVector<3>& spin, CVector<3>& move) const;
+    void advanceTurn(double dt);
     static double axisInput(bool pos, bool neg) { return (pos ? 1.0 : 0.0) - (neg ? 1.0 : 0.0); }
 };
 

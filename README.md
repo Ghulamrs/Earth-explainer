@@ -38,6 +38,7 @@ placeholder globe is shown.
 | Q/A, W/S, E/D | rotate ±X, ±Y, ±Z (hold several to combine) |
 | hold X / Y / Z + ←/→ | rotate about the held axis; hold two or three for their combined axis |
 | ←/→, ↑/↓, R/F | move ±X, ±Y, ±Z (when no X/Y/Z is held) |
+| Tab | next Frame2 turn: Frame1 X +74°, Frame1 Y −34°, own Z +35° (animated, permanent) |
 | L | Frame1's own axes (default) / world axes |
 | Drag | free rotation |
 | Scroll, pinch | zoom |

@@ -33,6 +33,7 @@ static int controlFor(NSEvent *e) {
     NSString *s = e.charactersIgnoringModifiers.lowercaseString;
     unichar c = s.length ? [s characterAtIndex:0] : 0;
     if (c == ' ') { [self.renderer reset];           return; }
+    if (e.keyCode == 48) { if (!e.isARepeat) [self.renderer turnFrame2]; return; }
     if (c == 'l') { if (!e.isARepeat) [self.renderer toggleAxesFrame]; return; }
 
     int control = controlFor(e);

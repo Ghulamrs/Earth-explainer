@@ -8,6 +8,7 @@
 - (void)clearControls;
 - (void)toggleSolid;
 - (void)toggleAxesFrame;
+- (void)turnFrame2;
 - (void)reset;
 - (void)zoomBy:(double)factor;
 - (void)dragByX:(double)dx y:(double)dyUp;

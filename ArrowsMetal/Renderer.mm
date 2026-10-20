@@ -151,6 +151,7 @@ static id<MTLBuffer> makeBuffer(id<MTLDevice> d, const void *bytes, size_t lengt
 - (void)clearControls       { _scene.clearControls(); [self wake]; }
 - (void)toggleSolid         { _scene.toggleSolid();     [self statusDidChange]; [self wake]; }
 - (void)toggleAxesFrame     { _scene.toggleAxesFrame(); [self statusDidChange]; [self wake]; }
+- (void)turnFrame2          { if (_scene.turnFrame2()) [self wake]; }
 - (void)reset               { _scene.reset();           [self wake]; }
 - (void)zoomBy:(double)f    { _scene.zoom(f);           [self wake]; }
 - (void)dragByX:(double)dx y:(double)dy { _scene.dragRotate(dx, dy); [self wake]; }

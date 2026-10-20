@@ -119,6 +119,37 @@ int main() {
     }
 
     {
+        const double deg = 3.14159265358979323846 / 180.0;
+        CQuat qx = CQuat::fromAxisAngle(CVector<3>(1, 0, 0),  74 * deg);
+        CQuat qy = CQuat::fromAxisAngle(CVector<3>(0, 1, 0), -34 * deg);
+        CQuat qz = CQuat::fromAxisAngle(CVector<3>(0, 0, 1),  35 * deg);
+        CQuat expected[3] = { qx, qy * qx, qy * qx * qz };
+
+        Scene s;
+        CVector<3> contact = s.frame2().origin();
+        for (int k = 0; k < 3; ++k) {
+            CHECK(s.turnFrame2());
+            CHECK(!s.turnFrame2());
+            CHECK(s.needsFrames());
+            s.update(Scene::kTurnSeconds * 0.5);
+            CHECK(s.isTurningFrame2());
+            s.update(Scene::kTurnSeconds * 0.5);
+            CHECK(!s.isTurningFrame2());
+            CRotrix got(s.frame2().pose().orientation), want(expected[k]);
+            for (int i = 0; i < 3; ++i) CHECK(near(got[i], want[i], 1e-12));
+            CHECK(near(s.frame2().origin(), contact, 1e-12));
+        }
+        CHECK(s.frame2TurnsStarted() == Scene::kFrame2TurnCount);
+        CHECK(!s.turnFrame2());
+        CHECK(!s.needsFrames());
+
+        CVector<3> z2 = s.frame2().axis(2);
+        CHECK(near(z2, CRotrix(qy * qx) * CVector<3>(0, 0, 1), 1e-12));
+        s.reset();
+        CHECK(near(s.frame2().axis(2), z2, 1e-12));
+    }
+
+    {
         Scene s;
         s.setControl(SelectX, true);
         CHECK(!s.needsFrames());

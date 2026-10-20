@@ -7,13 +7,29 @@ const double Scene::kMorphSeconds = 0.6;
 const double Scene::kEarthRadius   = 1.0;
 const double Scene::kLabelDistance = ArrowShape().totalLength() + 0.22;
 const double Scene::kFrame2Scale   = 0.4;
+const double Scene::kTurnSeconds   = 1.2;
+
+namespace {
+struct Turn {
+    CVector<3> axis;
+    double     degrees;
+    bool       ownAxis;
+};
+
+const Turn kFrame2Turns[Scene::kFrame2TurnCount] = {
+    { CVector<3>(1, 0, 0),  74.0, false },
+    { CVector<3>(0, 1, 0), -34.0, false },
+    { CVector<3>(0, 0, 1),  35.0, true  },
+};
+}
 
 static const CVector<3> kViewerUp(1, 0, 0);
 
 Scene::Scene()
     : frame2_(kFrame2Scale), solid_(false), local_(true), morph_(0.0),
       distance_(7.5), aspect_(1.0),
-      viewDir_(CVector<3>(0.35, -0.40, -1.0).normalized()) {
+      viewDir_(CVector<3>(0.35, -0.40, -1.0).normalized()),
+      turnsStarted_(0), turning_(false), turnProgress_(0.0) {
     frame2_.attachTo(frame1_, CVector<3>(0.0, 0.0, -kEarthRadius));
     clearControls();
     rebuildCamera();
@@ -73,9 +89,29 @@ void Scene::motion(CVector<3>& spin, CVector<3>& move) const {
     }
 }
 
+bool Scene::turnFrame2() {
+    if (turning_ || turnsStarted_ == kFrame2TurnCount) return false;
+    turnBase_     = frame2_.pose().orientation;
+    turnProgress_ = 0.0;
+    turning_      = true;
+    ++turnsStarted_;
+    return true;
+}
+
+void Scene::advanceTurn(double dt) {
+    if (!turning_) return;
+    turnProgress_ += dt / kTurnSeconds;
+    if (turnProgress_ >= 1.0) { turnProgress_ = 1.0; turning_ = false; }
+    double e = turnProgress_ * turnProgress_ * (3.0 - 2.0 * turnProgress_);
+    const Turn& t = kFrame2Turns[turnsStarted_ - 1];
+    CQuat dq = CQuat::fromAxisAngle(t.axis, t.degrees * 3.14159265358979323846 / 180.0 * e);
+    frame2_.setOrientation(t.ownAxis ? turnBase_ * dq : dq * turnBase_);
+}
+
 bool Scene::update(double dt) {
     CVector<3> spin, move;
     motion(spin, move);
+    advanceTurn(dt);
 
     if (!spin.isZero()) {
         double angle = kRotateSpeed * dt;
@@ -99,7 +135,7 @@ bool Scene::update(double dt) {
 bool Scene::needsFrames() const {
     CVector<3> spin, move;
     motion(spin, move);
-    return !spin.isZero() || !move.isZero() || morph_ != (solid_ ? 1.0 : 0.0);
+    return turning_ || !spin.isZero() || !move.isZero() || morph_ != (solid_ ? 1.0 : 0.0);
 }
 
 AxisLabel Scene::projectAxisLabel(int axis, double w, double h, bool earthOpaque) const {
