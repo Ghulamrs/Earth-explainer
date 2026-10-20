@@ -14,8 +14,8 @@ struct ArrowShape {
     int    segments;
 
     ArrowShape()
-        : shaftRadius(0.05), shaftLength(1.95),
-          headRadius(0.13), headLength(0.45), segments(32) {}
+        : shaftRadius(0.032), shaftLength(1.95),
+          headRadius(0.085), headLength(0.45), segments(32) {}
 
     double totalLength() const { return shaftLength + headLength; }
 };

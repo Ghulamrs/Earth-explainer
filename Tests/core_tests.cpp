@@ -149,6 +149,8 @@ int main() {
             CHECK(near(offAxisMax, shape.headRadius, 1e-5));
         }
         CHECK(shape.totalLength() > earth.radius * 2.0);
+        CHECK(shape.shaftRadius <= 0.035 && shape.headRadius <= 0.09);
+        CHECK(shape.headRadius > shape.shaftRadius * 2.0);
         const SceneVertex& zv = m.vertices[2 * perArrow];
         CHECK(zv.color.x < 0.05f && zv.color.y < 0.05f && zv.color.z < 0.05f);
         CHECK(m.vertices[0].color.x > 0.8f && m.vertices[perArrow].color.y > 0.7f);
