@@ -54,13 +54,26 @@ void Scene::dragRotate(double dx, double dyUp) {
     model_.rotateWorld(axis, len * 0.008);
 }
 
+void Scene::motion(CVector<3>& spin, CVector<3>& move) const {
+    spin = CVector<3>(axisInput(controls_[RotXPos], controls_[RotXNeg]),
+                      axisInput(controls_[RotYPos], controls_[RotYNeg]),
+                      axisInput(controls_[RotZPos], controls_[RotZNeg]));
+    move = CVector<3>(axisInput(controls_[MoveXPos], controls_[MoveXNeg]),
+                      axisInput(controls_[MoveYPos], controls_[MoveYNeg]),
+                      axisInput(controls_[MoveZPos], controls_[MoveZNeg]));
+
+    CVector<3> selected(controls_[SelectX] ? 1.0 : 0.0,
+                        controls_[SelectY] ? 1.0 : 0.0,
+                        controls_[SelectZ] ? 1.0 : 0.0);
+    if (!selected.isZero()) {
+        spin += selected * move[0];
+        move = CVector<3>();
+    }
+}
+
 bool Scene::update(double dt) {
-    CVector<3> spin(axisInput(controls_[RotXPos], controls_[RotXNeg]),
-                    axisInput(controls_[RotYPos], controls_[RotYNeg]),
-                    axisInput(controls_[RotZPos], controls_[RotZNeg]));
-    CVector<3> move(axisInput(controls_[MoveXPos], controls_[MoveXNeg]),
-                    axisInput(controls_[MoveYPos], controls_[MoveYNeg]),
-                    axisInput(controls_[MoveZPos], controls_[MoveZNeg]));
+    CVector<3> spin, move;
+    motion(spin, move);
 
     if (!spin.isZero()) {
         double angle = kRotateSpeed * dt;
@@ -81,9 +94,9 @@ bool Scene::update(double dt) {
 }
 
 bool Scene::needsFrames() const {
-    for (int i = 0; i < ControlCount; ++i)
-        if (controls_[i]) return true;
-    return morph_ != (solid_ ? 1.0 : 0.0);
+    CVector<3> spin, move;
+    motion(spin, move);
+    return !spin.isZero() || !move.isZero() || morph_ != (solid_ ? 1.0 : 0.0);
 }
 
 AxisLabel Scene::projectAxisLabel(int axis, double w, double h, bool earthOpaque) const {

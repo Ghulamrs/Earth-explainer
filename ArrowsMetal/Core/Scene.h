@@ -13,6 +13,7 @@ struct AxisLabel {
 enum Control {
     RotXPos, RotXNeg, RotYPos, RotYNeg, RotZPos, RotZNeg,
     MoveXPos, MoveXNeg, MoveYPos, MoveYNeg, MoveZPos, MoveZNeg,
+    SelectX, SelectY, SelectZ,
     ControlCount
 };
 
@@ -62,6 +63,7 @@ private:
     CMatrix<4, 4>  viewProj_;
 
     void rebuildCamera();
+    void motion(CVector<3>& spin, CVector<3>& move) const;
     static double axisInput(bool pos, bool neg) { return (pos ? 1.0 : 0.0) - (neg ? 1.0 : 0.0); }
 };
 

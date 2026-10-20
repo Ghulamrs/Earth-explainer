@@ -19,6 +19,7 @@ static int controlFor(NSEvent *e) {
         case NSUpArrowFunctionKey:    return MoveYPos;
         case NSDownArrowFunctionKey:  return MoveYNeg;
         case 'r': return MoveZPos;  case 'f': return MoveZNeg;
+        case 'x': return SelectX;   case 'y': return SelectY;   case 'z': return SelectZ;
         default:  return -1;
     }
 }

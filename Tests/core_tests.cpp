@@ -65,6 +65,28 @@ int main() {
 
     {
         Scene s;
+        s.setControl(SelectX, true);
+        CHECK(!s.needsFrames());
+        s.setControl(SelectY, true);
+        s.setControl(MoveXPos, true);
+        CHECK(s.needsFrames());
+        s.update(0.25);
+        CHECK(near(s.transform().orientation.axis(), CVector<3>(1, 1, 0).normalized(), 1e-12));
+        CHECK(near(s.transform().orientation.angle(), Scene::kRotateSpeed * 0.25, 1e-12));
+        CHECK(near(s.transform().position, CVector<3>()));
+
+        Scene t;
+        t.setControl(SelectZ, true);
+        t.setControl(MoveXNeg, true);
+        t.update(0.25);
+        CHECK(near(t.transform().orientation.axis(), CVector<3>(0, 0, -1), 1e-12));
+        t.setControl(SelectZ, false);
+        t.update(0.25);
+        CHECK(near(t.transform().position, CVector<3>(-Scene::kMoveSpeed * 0.25, 0, 0), 1e-12));
+    }
+
+    {
+        Scene s;
         CHECK(near(s.solidAlpha(), 0.0));
         s.toggleSolid();
         CHECK(s.needsFrames());
