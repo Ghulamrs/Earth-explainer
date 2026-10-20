@@ -20,6 +20,7 @@
     NSUInteger                   _arrowIndexCount;
     NSUInteger                   _earthIndexCount;
     NSUInteger                   _lineIndexCount;
+    NSUInteger                   _arrowLineIndexCount;
     id<MTLTexture>               _earthTexture;
     BOOL                         _realTexture;
     NSArray<NSView *>           *_labels;
@@ -93,6 +94,7 @@ static id<MTLBuffer> makeBuffer(id<MTLDevice> d, const void *bytes, size_t lengt
     _arrowIndexCount = mesh.arrowTriangles.size();
     _earthIndexCount = mesh.earthTriangles.size();
     _lineIndexCount  = mesh.lines.size();
+    _arrowLineIndexCount = mesh.arrowLineIndexCount;
 }
 
 - (void)loadEarthTexture {
@@ -185,20 +187,9 @@ static id<MTLBuffer> makeBuffer(id<MTLDevice> d, const void *bytes, size_t lengt
     }
 }
 
-- (void)drawInMTKView:(MTKView *)view {
-    CFTimeInterval now = CACurrentMediaTime();
-    double dt = _lastTime > 0 ? now - _lastTime : 0.0;
-    if (dt > 0.05) dt = 0.05;
-    _lastTime = now;
-    bool more = _scene.update(dt);
-
-    CMatrix<4, 4> model = _scene.modelMatrix();
-    CMatrix<4, 4> mvp   = _scene.viewProjection() * model;
-    const ViewBasis& cam = _scene.cameraBasis();
-    CVector<3> light = (cam.up * 0.6 - cam.right * 0.45 - cam.forward * 0.75).normalized();
-
+- (FrameUniforms)uniformsFor:(const CMatrix<4, 4>&)model light:(const CVector<3>&)light {
     FrameUniforms u;
-    toColumnMajor(mvp,   u.mvp.m);
+    toColumnMajor(_scene.viewProjection() * model, u.mvp.m);
     toColumnMajor(model, u.model.m);
     const CVector<3>& eye = _scene.eye();
     for (int i = 0; i < 3; ++i) { u.eye.v[i] = (float)eye[i]; u.lightDir.v[i] = (float)light[i]; }
@@ -206,6 +197,26 @@ static id<MTLBuffer> makeBuffer(id<MTLDevice> d, const void *bytes, size_t lengt
     u.params.v[0] = (float)_scene.solidAlpha();
     u.params.v[1] = (float)_scene.wireAlpha();
     u.params.v[2] = u.params.v[3] = 0.0f;
+    return u;
+}
+
+- (void)bind:(const FrameUniforms&)u to:(id<MTLRenderCommandEncoder>)enc {
+    [enc setVertexBytes:&u length:sizeof(u) atIndex:kBufferUniforms];
+    [enc setFragmentBytes:&u length:sizeof(u) atIndex:kBufferUniforms];
+}
+
+- (void)drawInMTKView:(MTKView *)view {
+    CFTimeInterval now = CACurrentMediaTime();
+    double dt = _lastTime > 0 ? now - _lastTime : 0.0;
+    if (dt > 0.05) dt = 0.05;
+    _lastTime = now;
+    bool more = _scene.update(dt);
+
+    const ViewBasis& cam = _scene.cameraBasis();
+    CVector<3> light = (cam.up * 0.6 - cam.right * 0.45 - cam.forward * 0.75).normalized();
+    FrameUniforms u1 = [self uniformsFor:_scene.frame1().drawMatrix() light:light];
+    FrameUniforms u2 = [self uniformsFor:_scene.frame2().drawMatrix() light:light];
+    float solid = u1.params.v[0], wire = u1.params.v[1];
 
     MTLRenderPassDescriptor *pass = view.currentRenderPassDescriptor;
     id<MTLCommandBuffer> cmd = [_queue commandBuffer];
@@ -214,22 +225,28 @@ static id<MTLBuffer> makeBuffer(id<MTLDevice> d, const void *bytes, size_t lengt
         [enc setDepthStencilState:_depthState];
         [enc setFrontFacingWinding:MTLWindingCounterClockwise];
         [enc setVertexBuffer:_vertexBuffer offset:0 atIndex:kBufferVertices];
-        [enc setVertexBytes:&u length:sizeof(u) atIndex:kBufferUniforms];
-        [enc setFragmentBytes:&u length:sizeof(u) atIndex:kBufferUniforms];
 
-        if (u.params.v[1] > 0.0f) {
+        if (wire > 0.0f) {
             [enc setRenderPipelineState:_wirePipeline];
             [enc setCullMode:MTLCullModeNone];
+            [self bind:u1 to:enc];
             [enc drawIndexedPrimitives:MTLPrimitiveTypeLine indexCount:_lineIndexCount
                              indexType:MTLIndexTypeUInt16 indexBuffer:_lineIndices indexBufferOffset:0];
+            [self bind:u2 to:enc];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeLine indexCount:_arrowLineIndexCount
+                             indexType:MTLIndexTypeUInt16 indexBuffer:_lineIndices indexBufferOffset:0];
         }
-        if (u.params.v[0] > 0.0f) {
+        if (solid > 0.0f) {
             [enc setCullMode:MTLCullModeBack];
+            [self bind:u1 to:enc];
             [enc setRenderPipelineState:_earthPipeline];
             [enc setFragmentTexture:_earthTexture atIndex:kTextureEarth];
             [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:_earthIndexCount
                              indexType:MTLIndexTypeUInt16 indexBuffer:_earthIndices indexBufferOffset:0];
             [enc setRenderPipelineState:_metalPipeline];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:_arrowIndexCount
+                             indexType:MTLIndexTypeUInt16 indexBuffer:_arrowIndices indexBufferOffset:0];
+            [self bind:u2 to:enc];
             [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:_arrowIndexCount
                              indexType:MTLIndexTypeUInt16 indexBuffer:_arrowIndices indexBufferOffset:0];
         }

@@ -89,6 +89,37 @@ int main() {
 
     {
         Scene s;
+        EarthShape earth;
+        const AxisFrame& f1 = s.frame1();
+        const AxisFrame& f2 = s.frame2();
+        CHECK(near(f2.origin(), earth.direction(0, 0) * Scene::kEarthRadius, 1e-12));
+        CHECK(dot(f2.origin(), s.eye() - f2.origin()) > 0.0);
+        CHECK(near(f2.scale(), Scene::kFrame2Scale));
+
+        s.setControl(RotXPos, true); s.setControl(RotYNeg, true);
+        s.update(0.7);
+        s.clearControls();
+        s.setControl(MoveZPos, true);
+        s.update(0.4);
+        s.clearControls();
+        s.dragRotate(30, -12);
+
+        CVector<3> contact = transformPoint(f1.matrix(), CVector<3>(0, 0, -Scene::kEarthRadius));
+        CHECK(near(f2.origin(), contact, 1e-12));
+        CHECK(near(distance(f2.origin(), f1.origin()), Scene::kEarthRadius, 1e-12));
+        for (int i = 0; i < 3; ++i) CHECK(near(f2.axis(i), f1.axis(i), 1e-12));
+        CHECK(near(transformPoint(f2.drawMatrix(), CVector<3>(0, 1, 0)), f2.origin() + f2.axis(1) * Scene::kFrame2Scale, 1e-12));
+
+        s.reset();
+        CHECK(near(f2.origin(), CVector<3>(0, 0, -Scene::kEarthRadius), 1e-12));
+
+        SceneMesh m = buildScene();
+        CHECK(m.arrowLineIndexCount > 0 && m.arrowLineIndexCount < (int)m.lines.size());
+        for (int i = 0; i < m.arrowLineIndexCount; ++i) CHECK(m.lines[i] < m.arrowVertexCount);
+    }
+
+    {
+        Scene s;
         s.setControl(SelectX, true);
         CHECK(!s.needsFrames());
         s.setControl(SelectY, true);

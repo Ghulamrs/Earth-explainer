@@ -180,6 +180,7 @@ SceneMesh buildScene(const ArrowShape& shape, const EarthShape& earth) {
     };
     for (int i = 0; i < 3; ++i) appendArrow(mesh, shape, specs[i]);
     mesh.arrowVertexCount = (int)mesh.vertices.size();
+    mesh.arrowLineIndexCount = (int)mesh.lines.size();
     appendEarth(mesh, earth);
     return mesh;
 }

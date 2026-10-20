@@ -6,13 +6,15 @@ const double Scene::kMoveSpeed    = 1.5;
 const double Scene::kMorphSeconds = 0.6;
 const double Scene::kEarthRadius   = 1.0;
 const double Scene::kLabelDistance = ArrowShape().totalLength() + 0.22;
+const double Scene::kFrame2Scale   = 0.4;
 
 static const CVector<3> kViewerUp(1, 0, 0);
 
 Scene::Scene()
-    : solid_(false), local_(true), morph_(0.0),
+    : frame2_(kFrame2Scale), solid_(false), local_(true), morph_(0.0),
       distance_(7.5), aspect_(1.0),
       viewDir_(CVector<3>(0.35, -0.40, -1.0).normalized()) {
+    frame2_.attachTo(frame1_, CVector<3>(0.0, 0.0, -kEarthRadius));
     clearControls();
     rebuildCamera();
 }

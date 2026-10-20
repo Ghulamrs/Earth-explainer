@@ -24,8 +24,11 @@ public:
     static const double kMorphSeconds;
     static const double kEarthRadius;
     static const double kLabelDistance;
+    static const double kFrame2Scale;
 
     Scene();
+    Scene(const Scene&) = delete;
+    Scene& operator=(const Scene&) = delete;
 
     void setControl(Control c, bool down) { controls_[c] = down; }
     void clearControls();
@@ -39,7 +42,6 @@ public:
     bool update(double dt);
     bool needsFrames() const;
 
-    CMatrix<4, 4>        modelMatrix() const { return frame1_.matrix(); }
     const CMatrix<4, 4>& viewProjection() const { return viewProj_; }
     const CVector<3>&    eye() const { return eye_; }
     double solidAlpha() const { return morph_; }
@@ -47,12 +49,14 @@ public:
     bool   isSolid()    const { return solid_; }
     bool   isLocal()    const { return local_; }
     const AxisFrame&      frame1() const { return frame1_; }
+    const AxisFrame&      frame2() const { return frame2_; }
     const ViewBasis&      cameraBasis() const { return basis_; }
 
     AxisLabel projectAxisLabel(int axis, double viewWidth, double viewHeight, bool earthOpaque) const;
 
 private:
     AxisFrame      frame1_;
+    AxisFrame      frame2_;
     bool           controls_[ControlCount];
     bool           solid_, local_;
     double         morph_;

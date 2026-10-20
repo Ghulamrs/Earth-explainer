@@ -50,6 +50,7 @@ struct SceneMesh {
     std::vector<uint16_t>    earthTriangles;
     std::vector<uint16_t>    lines;
     int                      arrowVertexCount;
+    int                      arrowLineIndexCount;
 };
 
 void appendArrow(SceneMesh& mesh, const ArrowShape& shape, const ArrowSpec& spec);

@@ -5,7 +5,14 @@
 
 class AxisFrame {
 public:
-    explicit AxisFrame(double scale = 1.0) : scale_(scale) {}
+    explicit AxisFrame(double scale = 1.0) : scale_(scale), parent_(0) {}
+
+    void attachTo(const AxisFrame& parent, const CVector<3>& at) {
+        parent_ = &parent;
+        home_   = RigidTransform();
+        home_.position = at;
+        pose_   = home_;
+    }
 
     void rotate(const CVector<3>& axis, double radians)         { pose_.rotateLocal(axis, radians); }
     void rotateInParent(const CVector<3>& axis, double radians) { pose_.rotateWorld(axis, radians); }
@@ -16,7 +23,7 @@ public:
     const RigidTransform& pose() const { return pose_; }
     double scale() const { return scale_; }
 
-    CMatrix<4, 4> matrix() const { return pose_.matrix(); }
+    CMatrix<4, 4> matrix() const { return parent_ ? parent_->matrix() * pose_.matrix() : pose_.matrix(); }
 
     CMatrix<4, 4> drawMatrix() const {
         CMatrix<4, 4> M = matrix();
@@ -30,6 +37,7 @@ public:
 private:
     RigidTransform pose_, home_;
     double         scale_;
+    const AxisFrame* parent_;
 };
 
 #endif
