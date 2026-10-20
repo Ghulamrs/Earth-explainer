@@ -2,7 +2,7 @@
 #define ARROWS_SCENE_H
 
 #include "Projection.h"
-#include "RigidTransform.h"
+#include "AxisFrame.h"
 
 struct AxisLabel {
     double x, y;
@@ -39,20 +39,20 @@ public:
     bool update(double dt);
     bool needsFrames() const;
 
-    CMatrix<4, 4>        modelMatrix() const { return model_.matrix(); }
+    CMatrix<4, 4>        modelMatrix() const { return frame1_.matrix(); }
     const CMatrix<4, 4>& viewProjection() const { return viewProj_; }
     const CVector<3>&    eye() const { return eye_; }
     double solidAlpha() const { return morph_; }
     double wireAlpha()  const { return 1.0 - morph_; }
     bool   isSolid()    const { return solid_; }
     bool   isLocal()    const { return local_; }
-    const RigidTransform& transform() const { return model_; }
+    const AxisFrame&      frame1() const { return frame1_; }
     const ViewBasis&      cameraBasis() const { return basis_; }
 
     AxisLabel projectAxisLabel(int axis, double viewWidth, double viewHeight, bool earthOpaque) const;
 
 private:
-    RigidTransform model_;
+    AxisFrame      frame1_;
     bool           controls_[ControlCount];
     bool           solid_, local_;
     double         morph_;

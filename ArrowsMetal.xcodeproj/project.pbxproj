@@ -29,6 +29,7 @@
 		5C5371D366D890E1A678695E /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
 		C74B22F0BFBF42382AE1D904 /* Projection.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Projection.h; sourceTree = "<group>"; };
 		48D85D9757AF0DCBCA61295B /* RigidTransform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RigidTransform.h; sourceTree = "<group>"; };
+		9761D4D7611ACD0DD703653B /* AxisFrame.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AxisFrame.h; sourceTree = "<group>"; };
 		37ED1BE172AA293282AF6F0F /* Scene.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Scene.h; sourceTree = "<group>"; };
 		37D5EBD97E34A437514880AE /* Scene.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Scene.cpp; sourceTree = "<group>"; };
 		C149D46E65E71D097AC1FAF5 /* ArrowMesh.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArrowMesh.h; sourceTree = "<group>"; };
@@ -96,6 +97,7 @@
 			children = (
 				C74B22F0BFBF42382AE1D904 /* Projection.h */,
 				48D85D9757AF0DCBCA61295B /* RigidTransform.h */,
+				9761D4D7611ACD0DD703653B /* AxisFrame.h */,
 				37ED1BE172AA293282AF6F0F /* Scene.h */,
 				37D5EBD97E34A437514880AE /* Scene.cpp */,
 				C149D46E65E71D097AC1FAF5 /* ArrowMesh.h */,

@@ -10,7 +10,7 @@ const double Scene::kLabelDistance = ArrowShape().totalLength() + 0.22;
 static const CVector<3> kViewerUp(1, 0, 0);
 
 Scene::Scene()
-    : solid_(false), local_(false), morph_(0.0),
+    : solid_(false), local_(true), morph_(0.0),
       distance_(7.5), aspect_(1.0),
       viewDir_(CVector<3>(0.35, -0.40, -1.0).normalized()) {
     clearControls();
@@ -22,7 +22,7 @@ void Scene::clearControls() {
 }
 
 void Scene::reset() {
-    model_.reset();
+    frame1_.reset();
     distance_ = 7.5;
     rebuildCamera();
 }
@@ -51,7 +51,7 @@ void Scene::dragRotate(double dx, double dyUp) {
     CVector<3> axis = basis_.right * (-dyUp) + basis_.up * dx;
     double len = axis.length();
     if (len == 0.0) return;
-    model_.rotateWorld(axis, len * 0.008);
+    frame1_.rotateInParent(axis, len * 0.008);
 }
 
 void Scene::motion(CVector<3>& spin, CVector<3>& move) const {
@@ -77,12 +77,13 @@ bool Scene::update(double dt) {
 
     if (!spin.isZero()) {
         double angle = kRotateSpeed * dt;
-        if (local_) model_.rotateLocal(spin, angle);
-        else        model_.rotateWorld(spin, angle);
+        if (local_) frame1_.rotate(spin, angle);
+        else        frame1_.rotateInParent(spin, angle);
     }
     if (!move.isZero()) {
         CVector<3> step = move.normalized() * (kMoveSpeed * dt);
-        model_.translate(local_ ? model_.rotation() * step : step);
+        if (local_) frame1_.move(step);
+        else        frame1_.moveInParent(step);
     }
 
     double target = solid_ ? 1.0 : 0.0;
@@ -101,7 +102,7 @@ bool Scene::needsFrames() const {
 
 AxisLabel Scene::projectAxisLabel(int axis, double w, double h, bool earthOpaque) const {
     AxisLabel out = { 0.0, 0.0, false, false };
-    CMatrix<4, 4> M = model_.matrix();
+    CMatrix<4, 4> M = frame1_.matrix();
     CVector<4> world4 = M * (CVector<3>::unit(axis) * kLabelDistance).resized<4>(1.0);
     CVector<3> world  = world4.head<3>();
 
@@ -115,7 +116,7 @@ AxisLabel Scene::projectAxisLabel(int axis, double w, double h, bool earthOpaque
         CVector<3> d = world - eye_;
         double len = d.length();
         CVector<3> dir = d / len;
-        CVector<3> oc  = eye_ - model_.position;
+        CVector<3> oc  = eye_ - frame1_.origin();
         double b    = oc.dot(dir);
         double disc = b * b - (oc.lengthSquared() - kEarthRadius * kEarthRadius);
         if (disc > 0.0) {

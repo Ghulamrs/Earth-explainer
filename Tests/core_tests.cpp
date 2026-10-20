@@ -56,11 +56,35 @@ int main() {
         s.setControl(RotYPos, true);
         s.update(0.25);
         CVector<3> expectedAxis = CVector<3>(1, 1, 0).normalized();
-        CHECK(near(s.transform().orientation.axis(), expectedAxis, 1e-12));
-        CHECK(near(s.transform().orientation.angle(), Scene::kRotateSpeed * 0.25, 1e-12));
+        CHECK(near(s.frame1().pose().orientation.axis(), expectedAxis, 1e-12));
+        CHECK(near(s.frame1().pose().orientation.angle(), Scene::kRotateSpeed * 0.25, 1e-12));
         CHECK(s.needsFrames());
         s.clearControls();
         CHECK(!s.needsFrames());
+    }
+
+    {
+        const double quarter = 3.14159265358979323846 / 2;
+        Scene s;
+        CHECK(s.isLocal());
+        s.setControl(RotZPos, true);
+        s.update(quarter / Scene::kRotateSpeed);
+        s.setControl(RotZPos, false);
+        CHECK(near(s.frame1().axis(0), CVector<3>(0, 1, 0), 1e-12));
+        CVector<3> y1 = s.frame1().axis(1);
+        s.setControl(RotXPos, true);
+        s.update(0.5);
+        CHECK(near(s.frame1().axis(0), CVector<3>(0, 1, 0), 1e-12));
+        CHECK(!near(s.frame1().axis(1), y1, 1e-3));
+        CHECK(near(dot(s.frame1().axis(1), s.frame1().axis(0)), 0.0, 1e-12));
+
+        AxisFrame f(0.4);
+        f.rotate(CVector<3>(0, 0, 1), quarter);
+        f.move(CVector<3>(1, 0, 0));
+        CHECK(near(f.origin(), CVector<3>(0, 1, 0), 1e-12));
+        CHECK(near(transformPoint(f.drawMatrix(), CVector<3>(1, 0, 0)), CVector<3>(0, 1.4, 0), 1e-12));
+        f.reset();
+        CHECK(near(f.origin(), CVector<3>()) && near(f.axis(2), CVector<3>(0, 0, 1)));
     }
 
     {
@@ -71,18 +95,18 @@ int main() {
         s.setControl(MoveXPos, true);
         CHECK(s.needsFrames());
         s.update(0.25);
-        CHECK(near(s.transform().orientation.axis(), CVector<3>(1, 1, 0).normalized(), 1e-12));
-        CHECK(near(s.transform().orientation.angle(), Scene::kRotateSpeed * 0.25, 1e-12));
-        CHECK(near(s.transform().position, CVector<3>()));
+        CHECK(near(s.frame1().pose().orientation.axis(), CVector<3>(1, 1, 0).normalized(), 1e-12));
+        CHECK(near(s.frame1().pose().orientation.angle(), Scene::kRotateSpeed * 0.25, 1e-12));
+        CHECK(near(s.frame1().pose().position, CVector<3>()));
 
         Scene t;
         t.setControl(SelectZ, true);
         t.setControl(MoveXNeg, true);
         t.update(0.25);
-        CHECK(near(t.transform().orientation.axis(), CVector<3>(0, 0, -1), 1e-12));
+        CHECK(near(t.frame1().pose().orientation.axis(), CVector<3>(0, 0, -1), 1e-12));
         t.setControl(SelectZ, false);
         t.update(0.25);
-        CHECK(near(t.transform().position, CVector<3>(-Scene::kMoveSpeed * 0.25, 0, 0), 1e-12));
+        CHECK(near(t.frame1().origin(), t.frame1().axis(0) * (-Scene::kMoveSpeed * 0.25), 1e-12));
     }
 
     {
@@ -217,7 +241,7 @@ int main() {
 
         Scene h;
         h.dragRotate(0.0, angleBetween(CVector<3>::unit(0), h.cameraBasis().forward) / 0.008);
-        CHECK(near(h.transform().rotation() * CVector<3>::unit(0), h.cameraBasis().forward, 1e-9));
+        CHECK(near(h.frame1().axis(0), h.cameraBasis().forward, 1e-9));
         CHECK(h.projectAxisLabel(0, 800, 600, true).occluded);
         CHECK(!h.projectAxisLabel(0, 800, 600, false).occluded);
         CHECK(!s.projectAxisLabel(1, 800, 600, true).occluded);
