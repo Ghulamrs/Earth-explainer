@@ -7,7 +7,6 @@
 - (BOOL)acceptsFirstResponder { return YES; }
 - (BOOL)acceptsFirstMouse:(NSEvent *)event { return YES; }
 
-// Held keys -> continuous motion. Several at once combine into one axis.
 static int controlFor(NSEvent *e) {
     NSString *s = e.charactersIgnoringModifiers.lowercaseString;
     if (s.length == 0) return -1;
@@ -26,7 +25,7 @@ static int controlFor(NSEvent *e) {
 
 - (void)keyDown:(NSEvent *)e {
     if (e.modifierFlags & NSEventModifierFlagCommand) { [super keyDown:e]; return; }
-    if (e.keyCode == 36 || e.keyCode == 76) {          // Return / keypad Enter
+    if (e.keyCode == 36 || e.keyCode == 76) {
         if (!e.isARepeat) [self.renderer toggleSolid];
         return;
     }
@@ -46,18 +45,15 @@ static int controlFor(NSEvent *e) {
     else [super keyUp:e];
 }
 
-// Never leave a key "stuck" when focus goes elsewhere.
 - (BOOL)resignFirstResponder {
     [self.renderer clearControls];
     return [super resignFirstResponder];
 }
 
-// Drag: free rotation about an arbitrary axis in the screen plane.
 - (void)mouseDragged:(NSEvent *)e {
     [self.renderer dragByX:e.deltaX y:-e.deltaY];
 }
 
-// Scroll / two-finger swipe: zoom.  Pinch: zoom.
 - (void)scrollWheel:(NSEvent *)e {
     double dy = e.hasPreciseScrollingDeltas ? e.scrollingDeltaY * 0.01 : e.scrollingDeltaY * 0.1;
     [self.renderer zoomBy:exp(-dy)];

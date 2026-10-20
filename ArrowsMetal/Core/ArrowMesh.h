@@ -1,5 +1,3 @@
-// Geometry for three arrows whose tails meet at the origin.
-// Built once at start-up; the GPU keeps it for the life of the app.
 #ifndef ARROWS_ARROW_MESH_H
 #define ARROWS_ARROW_MESH_H
 
@@ -13,30 +11,50 @@ struct ArrowShape {
     double shaftLength;
     double headRadius;
     double headLength;
-    int    segments;      // around the circumference
+    int    segments;
 
     ArrowShape()
-        : shaftRadius(0.05), shaftLength(1.6),
-          headRadius(0.13), headLength(0.4), segments(32) {}
+        : shaftRadius(0.05), shaftLength(1.95),
+          headRadius(0.13), headLength(0.45), segments(32) {}
 
     double totalLength() const { return shaftLength + headLength; }
 };
 
 struct ArrowSpec {
-    CVector<3> direction;   // where the arrow points (need not be unit)
-    CVector<3> color;       // linear RGB
+    CVector<3> direction;
+    CVector<3> color;
 };
 
-struct TriadMesh {
-    std::vector<ArrowVertex> vertices;      // shared by both index lists
-    std::vector<uint16_t>    triangles;     // solid
-    std::vector<uint16_t>    lines;         // wireframe
+struct EarthShape {
+    double     radius;
+    int        stacks;
+    int        slices;
+    int        gridEvery;
+    CVector<3> north;
+    CVector<3> greenwich;
+    CVector<3> color;
+
+    EarthShape()
+        : radius(1.0), stacks(48), slices(96), gridEvery(4),
+          north(1, 0, 0), greenwich(0, 0, -1), color(0.10, 0.35, 1.0) {}
+
+    CVector<3> direction(double latitude, double longitude) const {
+        CVector<3> onEquator = CRotrix::axisAngle(north, longitude) * greenwich;
+        return north * std::sin(latitude) + onEquator * std::cos(latitude);
+    }
 };
 
-// Appends one arrow to the mesh.
-void appendArrow(TriadMesh& mesh, const ArrowShape& shape, const ArrowSpec& spec);
+struct SceneMesh {
+    std::vector<SceneVertex> vertices;
+    std::vector<uint16_t>    arrowTriangles;
+    std::vector<uint16_t>    earthTriangles;
+    std::vector<uint16_t>    lines;
+    int                      arrowVertexCount;
+};
 
-// Red along +X, green along +Y, blue along +Z.
-TriadMesh buildTriad(const ArrowShape& shape = ArrowShape());
+void appendArrow(SceneMesh& mesh, const ArrowShape& shape, const ArrowSpec& spec);
+void appendEarth(SceneMesh& mesh, const EarthShape& shape);
+
+SceneMesh buildScene(const ArrowShape& arrows = ArrowShape(), const EarthShape& earth = EarthShape());
 
 #endif

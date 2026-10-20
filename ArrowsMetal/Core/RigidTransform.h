@@ -1,6 +1,3 @@
-// Position + orientation of the triad. Orientation is a CQuat, so rotations
-// about any axis, or any combination of axes, compose without drift or
-// gimbal lock; CRotrix turns it into the 3x3 part of the model matrix.
 #ifndef ARROWS_RIGID_TRANSFORM_H
 #define ARROWS_RIGID_TRANSFORM_H
 
@@ -13,12 +10,10 @@ public:
 
     RigidTransform() : orientation(CQuat::identity()), position() {}
 
-    // About a world-fixed axis: q' = dq * q
     void rotateWorld(const CVector<3>& axis, double radians) {
         orientation = (CQuat::fromAxisAngle(axis, radians) * orientation).normalized();
     }
 
-    // About the object's own (body) axis: q' = q * dq
     void rotateLocal(const CVector<3>& axis, double radians) {
         orientation = (orientation * CQuat::fromAxisAngle(axis, radians)).normalized();
     }
@@ -29,8 +24,6 @@ public:
 
     CRotrix rotation() const { return CRotrix(orientation); }
 
-    // [ R | t ]
-    // [ 0 | 1 ]   -- each row is a rotation row padded with one translation component.
     CMatrix<4, 4> matrix() const {
         CRotrix R = rotation();
         return CMatrix<4, 4>(R[0].resized<4>(position[0]),

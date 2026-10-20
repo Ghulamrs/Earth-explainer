@@ -1,4 +1,3 @@
-// Checks the maths and geometry behind the app; no Cocoa or Metal needed.
 #include "ArrowMesh.h"
 #include "Scene.h"
 
@@ -18,11 +17,9 @@ static CVector<3> transformPoint(const CMatrix<4, 4>& M, const CVector<3>& p) {
 }
 
 int main() {
-    // Shared layout must match Metal's.
-    CHECK(sizeof(ArrowVertex) == 36);
+    CHECK(sizeof(SceneVertex) == 44);
     CHECK(sizeof(FrameUniforms) == 176);
 
-    // Model matrix = [R|t], and agrees with the quaternion's own rotate().
     {
         RigidTransform T;
         T.rotateWorld(CVector<3>(1, 2, 3), 0.7);
@@ -32,7 +29,6 @@ int main() {
         CHECK(near(T.matrix()[3][3], 1.0));
     }
 
-    // 100 000 small mixed rotations stay a proper rotation (no drift).
     {
         RigidTransform T;
         for (int i = 0; i < 100000; ++i) {
@@ -43,7 +39,6 @@ int main() {
         CHECK(near(T.orientation.norm(), 1.0, 1e-12));
     }
 
-    // Local rotation about a == world rotation about R*a.
     {
         RigidTransform A, B;
         A.rotateWorld(CVector<3>(0.2, 1, -0.5), 1.1);
@@ -55,7 +50,6 @@ int main() {
         CHECK(near(A.rotation().matrix[1], B.rotation().matrix[1], 1e-12));
     }
 
-    // Holding X and Y together rotates about (1,1,0).
     {
         Scene s;
         s.setControl(RotXPos, true);
@@ -69,7 +63,6 @@ int main() {
         CHECK(!s.needsFrames());
     }
 
-    // Wire -> solid morph runs, then the scene goes idle (no redraws).
     {
         Scene s;
         CHECK(near(s.solidAlpha(), 0.0));
@@ -78,17 +71,15 @@ int main() {
         int frames = 0;
         while (s.update(1.0 / 60.0)) ++frames;
         CHECK(near(s.solidAlpha(), 1.0));
-        CHECK(frames > 30 && frames < 40);   // ~0.6 s at 60 Hz
+        CHECK(frames > 30 && frames < 40);
     }
 
-    // Projection: near plane -> depth 0, far plane -> depth 1 (Metal convention).
     {
         CMatrix<4, 4> P = perspective(1.0, 1.5, 0.1, 100.0);
         CHECK(near(transformPoint(P, CVector<3>(0, 0, -0.1))[2], 0.0, 1e-12));
         CHECK(near(transformPoint(P, CVector<3>(0, 0, -100.0))[2], 1.0, 1e-9));
     }
 
-    // View: eye maps to the origin, target lies straight ahead on -Z.
     {
         CVector<3> eye(3, 4, 5);
         ViewBasis b;
@@ -99,7 +90,6 @@ int main() {
         CHECK(near(dot(b.right, b.up), 0.0, 1e-12));
     }
 
-    // Column-major conversion: element (row r, col c) lands at c*4 + r.
     {
         CMatrix<4, 4> M;
         for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) M[r][c] = 10 * r + c;
@@ -108,51 +98,105 @@ int main() {
         CHECK(f[1] == 10.0f && f[4] == 1.0f && f[14] == 23.0f);
     }
 
-    // Mesh: three arrows, tails at origin, tips on the axes, sane normals/indices.
+    ArrowShape shape;
+    EarthShape earth;
+    SceneMesh m = buildScene(shape, earth);
     {
-        ArrowShape shape;
-        TriadMesh m = buildTriad(shape);
         CHECK(m.vertices.size() < 65536);
-        CHECK(m.triangles.size() % 3 == 0 && m.lines.size() % 2 == 0);
-        for (size_t i = 0; i < m.triangles.size(); ++i) CHECK(m.triangles[i] < m.vertices.size());
-        for (size_t i = 0; i < m.lines.size(); ++i)     CHECK(m.lines[i] < m.vertices.size());
+        CHECK(m.arrowTriangles.size() % 3 == 0 && m.earthTriangles.size() % 3 == 0 && m.lines.size() % 2 == 0);
+        for (size_t i = 0; i < m.arrowTriangles.size(); ++i) CHECK(m.arrowTriangles[i] < m.arrowVertexCount);
+        for (size_t i = 0; i < m.earthTriangles.size(); ++i)
+            CHECK(m.earthTriangles[i] >= m.arrowVertexCount && m.earthTriangles[i] < m.vertices.size());
+        for (size_t i = 0; i < m.lines.size(); ++i) CHECK(m.lines[i] < m.vertices.size());
 
-        int perArrow = (int)m.vertices.size() / 3;
+        int perArrow = m.arrowVertexCount / 3;
         for (int a = 0; a < 3; ++a) {
             CVector<3> axis = CVector<3>::unit(a);
             double tipMax = 0.0, offAxisMax = 0.0;
             for (int i = a * perArrow; i < (a + 1) * perArrow; ++i) {
-                const ArrowVertex& v = m.vertices[i];
+                const SceneVertex& v = m.vertices[i];
                 CVector<3> p(v.position.x, v.position.y, v.position.z);
                 CVector<3> n(v.normal.x, v.normal.y, v.normal.z);
                 CHECK(near(n.length(), 1.0, 1e-5));
-                CHECK(p.dot(axis) >= -1e-6);                 // nothing behind the tail
+                CHECK(p.dot(axis) >= -1e-6);
                 if (p.dot(axis) > tipMax) tipMax = p.dot(axis);
                 double off = p.rejectedFrom(axis).length();
                 if (off > offAxisMax) offAxisMax = off;
-                CHECK(v.color.x + v.color.y + v.color.z > 0.5f);
             }
             CHECK(near(tipMax, shape.totalLength(), 1e-5));
             CHECK(near(offAxisMax, shape.headRadius, 1e-5));
         }
+        CHECK(shape.totalLength() > earth.radius * 2.0);
+        const SceneVertex& zv = m.vertices[2 * perArrow];
+        CHECK(zv.color.x < 0.05f && zv.color.y < 0.05f && zv.color.z < 0.05f);
+        CHECK(m.vertices[0].color.x > 0.8f && m.vertices[perArrow].color.y > 0.7f);
+    }
 
-        // Every solid triangle faces outward (counter-clockwise from outside):
-        // its geometric normal agrees with the stored vertex normals.
-        int inward = 0;
-        for (size_t i = 0; i < m.triangles.size(); i += 3) {
-            const ArrowVertex* v[3] = { &m.vertices[m.triangles[i]], &m.vertices[m.triangles[i + 1]], &m.vertices[m.triangles[i + 2]] };
-            CVector<3> p0(v[0]->position.x, v[0]->position.y, v[0]->position.z);
-            CVector<3> p1(v[1]->position.x, v[1]->position.y, v[1]->position.z);
-            CVector<3> p2(v[2]->position.x, v[2]->position.y, v[2]->position.z);
-            CVector<3> g = cross(p1 - p0, p2 - p0);
-            CVector<3> n = CVector<3>(v[0]->normal.x, v[0]->normal.y, v[0]->normal.z)
-                         + CVector<3>(v[1]->normal.x, v[1]->normal.y, v[1]->normal.z)
-                         + CVector<3>(v[2]->normal.x, v[2]->normal.y, v[2]->normal.z);
-            if (g.dot(n) <= 0.0) ++inward;
+    {
+        for (size_t i = m.arrowVertexCount; i < m.vertices.size(); ++i) {
+            const SceneVertex& v = m.vertices[i];
+            CVector<3> p(v.position.x, v.position.y, v.position.z);
+            CVector<3> n(v.normal.x, v.normal.y, v.normal.z);
+            CHECK(near(p.length(), earth.radius, 1e-5));
+            CHECK(near(n.length(), 1.0, 1e-5) && near(p.normalized(), n, 1e-5));
+            CHECK(v.uv.u >= 0.0f && v.uv.u <= 1.0f && v.uv.v >= 0.0f && v.uv.v <= 1.0f);
+            CHECK(v.color.z > v.color.x && v.color.z > v.color.y);
         }
+        const double d = 3.14159265358979323846 / 180.0;
+        CHECK(near(earth.direction(90 * d, 0),     CVector<3>(1, 0, 0), 1e-12));
+        CHECK(near(earth.direction(0, 0),          CVector<3>(0, 0, -1), 1e-12));
+        CHECK(near(earth.direction(0, 90 * d),     CVector<3>(0, 1, 0), 1e-12));
+        CHECK(near(earth.direction(0, 180 * d),    CVector<3>(0, 0, 1), 1e-12));
+        const SceneVertex& np = m.vertices[m.arrowVertexCount];
+        CHECK(near(np.position.x, earth.radius, 1e-6) && np.uv.v == 0.0f);
+    }
+
+    {
+        const std::vector<uint16_t>* lists[2] = { &m.arrowTriangles, &m.earthTriangles };
+        int inward = 0, degenerate = 0;
+        for (int l = 0; l < 2; ++l)
+            for (size_t i = 0; i < lists[l]->size(); i += 3) {
+                const SceneVertex* v[3] = { &m.vertices[(*lists[l])[i]], &m.vertices[(*lists[l])[i + 1]], &m.vertices[(*lists[l])[i + 2]] };
+                CVector<3> p0(v[0]->position.x, v[0]->position.y, v[0]->position.z);
+                CVector<3> p1(v[1]->position.x, v[1]->position.y, v[1]->position.z);
+                CVector<3> p2(v[2]->position.x, v[2]->position.y, v[2]->position.z);
+                CVector<3> g = cross(p1 - p0, p2 - p0);
+                if (g.length() < 1e-12) { ++degenerate; continue; }
+                CVector<3> n = CVector<3>(v[0]->normal.x, v[0]->normal.y, v[0]->normal.z)
+                             + CVector<3>(v[1]->normal.x, v[1]->normal.y, v[1]->normal.z)
+                             + CVector<3>(v[2]->normal.x, v[2]->normal.y, v[2]->normal.z);
+                if (g.dot(n) <= 0.0) ++inward;
+            }
         CHECK(inward == 0);
-        std::printf("mesh: %d vertices, %d triangles, %d line segments\n",
-                    (int)m.vertices.size(), (int)m.triangles.size() / 3, (int)m.lines.size() / 2);
+        CHECK(degenerate == 0);
+        std::printf("mesh: %d vertices (%d arrows), %d triangles, %d line segments\n",
+                    (int)m.vertices.size(), m.arrowVertexCount,
+                    (int)(m.arrowTriangles.size() + m.earthTriangles.size()) / 3, (int)m.lines.size() / 2);
+    }
+
+    {
+        CHECK(near(cross(CVector<3>::unit(0), CVector<3>::unit(1)), CVector<3>::unit(2)));
+        Scene s;
+        const ViewBasis& b = s.cameraBasis();
+        CHECK(b.up.dot(CVector<3>::unit(0))      > 0.9);
+        CHECK(b.right.dot(CVector<3>::unit(1))   > 0.9);
+        CHECK(b.forward.dot(CVector<3>::unit(2)) > 0.8);
+        CHECK(near(cross(b.right, b.up), -b.forward, 1e-12));
+
+        AxisLabel x = s.projectAxisLabel(0, 800, 600, false);
+        AxisLabel y = s.projectAxisLabel(1, 800, 600, false);
+        AxisLabel z = s.projectAxisLabel(2, 800, 600, false);
+        CHECK(x.visible && y.visible && z.visible);
+        CHECK(x.y > 450 && std::fabs(x.x - 400) < 150);
+        CHECK(y.x > 550);
+        CHECK(std::fabs(z.x - 400) < 200 && std::fabs(z.y - 300) < 200);
+
+        Scene h;
+        h.dragRotate(0.0, angleBetween(CVector<3>::unit(0), h.cameraBasis().forward) / 0.008);
+        CHECK(near(h.transform().rotation() * CVector<3>::unit(0), h.cameraBasis().forward, 1e-9));
+        CHECK(h.projectAxisLabel(0, 800, 600, true).occluded);
+        CHECK(!h.projectAxisLabel(0, 800, 600, false).occluded);
+        CHECK(!s.projectAxisLabel(1, 800, 600, true).occluded);
     }
 
     std::printf(failures ? "%d FAILURE(S)\n" : "all core tests passed\n", failures);

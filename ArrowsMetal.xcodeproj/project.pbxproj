@@ -39,6 +39,7 @@
 		81D08B70E9FF7FFEB56366A2 /* CRotrix.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = CRotrix.h; path = "/Users/g.r.akhtar/Documents/Claude Overflow/C++ Vector Exercise/CRotrix.h"; sourceTree = "<absolute>"; };
 		87EFB7A9095308C3EBD80BAF /* core_tests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = core_tests.cpp; sourceTree = "<group>"; };
 		8DB2241C719E9C1A88414155 /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		E0BED2841952E2BB2FDE6EC0 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		5A8260536002144124269354 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -77,8 +78,17 @@
 				BF14A9A56A63B45FC3ED22F3 /* ShaderTypes.h */,
 				5C5371D366D890E1A678695E /* Shaders.metal */,
 				09493BE56224133F6B9363DA /* Core */,
+				36DD8FEC2A722EA27EAAF5D5 /* Resources */,
 			);
 			path = ArrowsMetal;
+			sourceTree = "<group>";
+		};
+		36DD8FEC2A722EA27EAAF5D5 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				E0BED2841952E2BB2FDE6EC0 /* README.md */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		09493BE56224133F6B9363DA /* Core */ = {
@@ -132,6 +142,7 @@
 				0F78FE532035D122ED352DBA /* Sources */,
 				DAF6AA633395B1B76148E35B /* Frameworks */,
 				943E4BBD9B51C81965501BA3 /* Resources */,
+				F70473819CF7A2F85109210F /* Copy Earth texture */,
 			);
 			buildRules = (
 			);
@@ -183,6 +194,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		F70473819CF7A2F85109210F /* Copy Earth texture */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Copy Earth texture";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "TEX=\"${SRCROOT}/ArrowsMetal/Resources\"\nDEST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$DEST\"\nfor f in earth.jpg earth.png; do\n  if [ -f \"$TEX/$f\" ]; then cp -f \"$TEX/$f\" \"$DEST/\"; fi\ndone\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0F78FE532035D122ED352DBA /* Sources */ = {
@@ -263,6 +292,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Arrows;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
@@ -281,6 +311,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Arrows;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";

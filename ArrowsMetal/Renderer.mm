@@ -10,13 +10,19 @@
     id<MTLDevice>                _device;
     id<MTLCommandQueue>          _queue;
     id<MTLRenderPipelineState>   _wirePipeline;
-    id<MTLRenderPipelineState>   _solidPipeline;
+    id<MTLRenderPipelineState>   _metalPipeline;
+    id<MTLRenderPipelineState>   _earthPipeline;
     id<MTLDepthStencilState>     _depthState;
     id<MTLBuffer>                _vertexBuffer;
-    id<MTLBuffer>                _triangleIndices;
+    id<MTLBuffer>                _arrowIndices;
+    id<MTLBuffer>                _earthIndices;
     id<MTLBuffer>                _lineIndices;
-    NSUInteger                   _triangleIndexCount;
+    NSUInteger                   _arrowIndexCount;
+    NSUInteger                   _earthIndexCount;
     NSUInteger                   _lineIndexCount;
+    id<MTLTexture>               _earthTexture;
+    BOOL                         _realTexture;
+    NSArray<NSView *>           *_labels;
 
     Scene                        _scene;
     CFTimeInterval               _lastTime;
@@ -28,16 +34,16 @@
     _device = view.device;
     _queue  = [_device newCommandQueue];
 
-    view.colorPixelFormat        = MTLPixelFormatBGRA8Unorm_sRGB;   // shade in linear, store sRGB
+    view.colorPixelFormat        = MTLPixelFormatBGRA8Unorm_sRGB;
     view.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
-    view.sampleCount             = 4;                                // MSAA: smooth wire lines
-    view.clearColor              = MTLClearColorMake(0.035, 0.037, 0.045, 1.0);
-    // Efficiency: no display-link while nothing moves; frames are requested on input.
+    view.sampleCount             = 4;
+    view.clearColor              = MTLClearColorMake(0.20, 0.22, 0.26, 1.0);
     view.paused                  = YES;
     view.enableSetNeedsDisplay   = YES;
 
     if (![self buildPipelines:view]) return nil;
     [self buildGeometry];
+    [self loadEarthTexture];
 
     MTLDepthStencilDescriptor *dd = [MTLDepthStencilDescriptor new];
     dd.depthCompareFunction = MTLCompareFunctionLess;
@@ -51,12 +57,12 @@
     if (!lib) { NSLog(@"No default Metal library"); return NO; }
 
     MTLRenderPipelineDescriptor *pd = [MTLRenderPipelineDescriptor new];
-    pd.vertexFunction                  = [lib newFunctionWithName:@"arrowVertex"];
+    pd.vertexFunction                  = [lib newFunctionWithName:@"sceneVertex"];
     pd.rasterSampleCount               = view.sampleCount;
     pd.depthAttachmentPixelFormat      = view.depthStencilPixelFormat;
     MTLRenderPipelineColorAttachmentDescriptor *ca = pd.colorAttachments[0];
     ca.pixelFormat                 = view.colorPixelFormat;
-    ca.blendingEnabled             = YES;      // used only during the cross-fade
+    ca.blendingEnabled             = YES;
     ca.sourceRGBBlendFactor        = MTLBlendFactorSourceAlpha;
     ca.destinationRGBBlendFactor   = MTLBlendFactorOneMinusSourceAlpha;
     ca.sourceAlphaBlendFactor      = MTLBlendFactorOne;
@@ -64,27 +70,64 @@
 
     NSError *err = nil;
     pd.fragmentFunction = [lib newFunctionWithName:@"wireFragment"];
-    _wirePipeline = [_device newRenderPipelineStateWithDescriptor:pd error:&err];
+    _wirePipeline  = [_device newRenderPipelineStateWithDescriptor:pd error:&err];
     pd.fragmentFunction = [lib newFunctionWithName:@"metalFragment"];
-    _solidPipeline = [_device newRenderPipelineStateWithDescriptor:pd error:&err];
-    if (!_wirePipeline || !_solidPipeline) { NSLog(@"Pipeline error: %@", err); return NO; }
+    _metalPipeline = [_device newRenderPipelineStateWithDescriptor:pd error:&err];
+    pd.fragmentFunction = [lib newFunctionWithName:@"earthFragment"];
+    _earthPipeline = [_device newRenderPipelineStateWithDescriptor:pd error:&err];
+    if (!_wirePipeline || !_metalPipeline || !_earthPipeline) { NSLog(@"Pipeline error: %@", err); return NO; }
     return YES;
 }
 
-// Built once on the CPU with CVector/CRotrix, uploaded once, never touched again.
+static id<MTLBuffer> makeBuffer(id<MTLDevice> d, const void *bytes, size_t length) {
+    return [d newBufferWithBytes:bytes length:length
+                         options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
+}
+
 - (void)buildGeometry {
-    TriadMesh mesh = buildTriad();
-    _vertexBuffer = [_device newBufferWithBytes:mesh.vertices.data()
-                                         length:mesh.vertices.size() * sizeof(ArrowVertex)
-                                        options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
-    _triangleIndices = [_device newBufferWithBytes:mesh.triangles.data()
-                                            length:mesh.triangles.size() * sizeof(uint16_t)
-                                           options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
-    _lineIndices = [_device newBufferWithBytes:mesh.lines.data()
-                                        length:mesh.lines.size() * sizeof(uint16_t)
-                                       options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
-    _triangleIndexCount = mesh.triangles.size();
-    _lineIndexCount     = mesh.lines.size();
+    SceneMesh mesh = buildScene();
+    _vertexBuffer = makeBuffer(_device, mesh.vertices.data(),       mesh.vertices.size()       * sizeof(SceneVertex));
+    _arrowIndices = makeBuffer(_device, mesh.arrowTriangles.data(), mesh.arrowTriangles.size() * sizeof(uint16_t));
+    _earthIndices = makeBuffer(_device, mesh.earthTriangles.data(), mesh.earthTriangles.size() * sizeof(uint16_t));
+    _lineIndices  = makeBuffer(_device, mesh.lines.data(),          mesh.lines.size()          * sizeof(uint16_t));
+    _arrowIndexCount = mesh.arrowTriangles.size();
+    _earthIndexCount = mesh.earthTriangles.size();
+    _lineIndexCount  = mesh.lines.size();
+}
+
+- (void)loadEarthTexture {
+    NSBundle *b = NSBundle.mainBundle;
+    NSURL *url = [b URLForResource:@"earth" withExtension:@"jpg"];
+    if (!url) url = [b URLForResource:@"earth" withExtension:@"png"];
+    if (url) {
+        MTKTextureLoader *loader = [[MTKTextureLoader alloc] initWithDevice:_device];
+        NSError *err = nil;
+        _earthTexture = [loader newTextureWithContentsOfURL:url
+                                                    options:@{ MTKTextureLoaderOptionSRGB: @YES,
+                                                               MTKTextureLoaderOptionGenerateMipmaps: @YES,
+                                                               MTKTextureLoaderOptionTextureStorageMode: @(MTLStorageModePrivate) }
+                                                      error:&err];
+        if (!_earthTexture) NSLog(@"Earth texture %@ failed: %@", url.lastPathComponent, err);
+    }
+    _realTexture = _earthTexture != nil;
+    if (_realTexture) return;
+
+    const int W = 256, H = 128;
+    std::vector<uint8_t> px(W * H * 4);
+    for (int y = 0; y < H; ++y) {
+        double lat = 90.0 - 180.0 * (y + 0.5) / H;
+        bool ice = std::fabs(lat) > 72.0;
+        for (int x = 0; x < W; ++x) {
+            uint8_t *p = &px[(y * W + x) * 4];
+            if (ice) { p[0] = 235; p[1] = 240; p[2] = 245; }
+            else     { p[0] = 20;  p[1] = (uint8_t)(70 + std::fabs(lat)); p[2] = 160; }
+            p[3] = 255;
+        }
+    }
+    MTLTextureDescriptor *td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm_sRGB
+                                                                                  width:W height:H mipmapped:NO];
+    _earthTexture = [_device newTextureWithDescriptor:td];
+    [_earthTexture replaceRegion:MTLRegionMake2D(0, 0, W, H) mipmapLevel:0 withBytes:px.data() bytesPerRow:W * 4];
 }
 
 #pragma mark - Input (from ArrowView)
@@ -92,9 +135,9 @@
 - (void)wake {
     MTKView *v = _view;
     if (_scene.needsFrames()) {
-        if (v.paused) { _lastTime = 0; v.paused = NO; }   // run at display rate
+        if (v.paused) { _lastTime = 0; v.paused = NO; }
     } else {
-        [v setNeedsDisplay:YES];                           // one frame only
+        [v setNeedsDisplay:YES];
     }
 }
 
@@ -109,11 +152,13 @@
 - (void)reset               { _scene.reset();           [self wake]; }
 - (void)zoomBy:(double)f    { _scene.zoom(f);           [self wake]; }
 - (void)dragByX:(double)dx y:(double)dy { _scene.dragRotate(dx, dy); [self wake]; }
+- (void)setAxisLabels:(NSArray<NSView *> *)labels { _labels = [labels copy]; [self wake]; }
 
 - (NSString *)statusText {
-    return [NSString stringWithFormat:@"%@   ·   rotate about %@ axes",
-            _scene.isSolid() ? @"Solid metal" : @"Wireframe",
-            _scene.isLocal() ? @"arrow (local)" : @"world"];
+    return [NSString stringWithFormat:@"%@   ·   rotate about %@ axes%@",
+            _scene.isSolid() ? @"Solid" : @"Wireframe",
+            _scene.isLocal() ? @"body (local)" : @"world",
+            _realTexture ? @"" : @"   ·   placeholder Earth: add Resources/earth.jpg"];
 }
 
 - (void)statusDidChange { if (self.statusChanged) self.statusChanged(self.statusText); }
@@ -125,6 +170,21 @@
     [view setNeedsDisplay:YES];
 }
 
+- (void)placeLabels:(MTKView *)view {
+    if (_labels.count != 3) return;
+    NSSize size = view.bounds.size;
+    bool earthOpaque = _scene.solidAlpha() > 0.5;
+    for (int i = 0; i < 3; ++i) {
+        AxisLabel a = _scene.projectAxisLabel(i, size.width, size.height, earthOpaque);
+        NSView *label = _labels[i];
+        label.hidden = !a.visible;
+        if (!a.visible) continue;
+        NSSize ls = label.frame.size;
+        [label setFrameOrigin:NSMakePoint(round(a.x - ls.width * 0.5), round(a.y - ls.height * 0.5))];
+        label.alphaValue = a.occluded ? 0.3 : 1.0;
+    }
+}
+
 - (void)drawInMTKView:(MTKView *)view {
     CFTimeInterval now = CACurrentMediaTime();
     double dt = _lastTime > 0 ? now - _lastTime : 0.0;
@@ -132,10 +192,10 @@
     _lastTime = now;
     bool more = _scene.update(dt);
 
-    // Per-frame CPU maths: one 4x4 product, done with CMatrix.
     CMatrix<4, 4> model = _scene.modelMatrix();
     CMatrix<4, 4> mvp   = _scene.viewProjection() * model;
-    CVector<3>    light = CVector<3>(-0.4, 0.9, 0.6).normalized();
+    const ViewBasis& cam = _scene.cameraBasis();
+    CVector<3> light = (cam.up * 0.6 - cam.right * 0.45 - cam.forward * 0.75).normalized();
 
     FrameUniforms u;
     toColumnMajor(mvp,   u.mvp.m);
@@ -157,24 +217,29 @@
         [enc setVertexBytes:&u length:sizeof(u) atIndex:kBufferUniforms];
         [enc setFragmentBytes:&u length:sizeof(u) atIndex:kBufferUniforms];
 
-        if (u.params.v[1] > 0.0f) {               // wireframe: one draw for all three arrows
+        if (u.params.v[1] > 0.0f) {
             [enc setRenderPipelineState:_wirePipeline];
             [enc setCullMode:MTLCullModeNone];
             [enc drawIndexedPrimitives:MTLPrimitiveTypeLine indexCount:_lineIndexCount
                              indexType:MTLIndexTypeUInt16 indexBuffer:_lineIndices indexBufferOffset:0];
         }
-        if (u.params.v[0] > 0.0f) {               // solid metal: one draw for all three arrows
-            [enc setRenderPipelineState:_solidPipeline];
+        if (u.params.v[0] > 0.0f) {
             [enc setCullMode:MTLCullModeBack];
-            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:_triangleIndexCount
-                             indexType:MTLIndexTypeUInt16 indexBuffer:_triangleIndices indexBufferOffset:0];
+            [enc setRenderPipelineState:_earthPipeline];
+            [enc setFragmentTexture:_earthTexture atIndex:kTextureEarth];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:_earthIndexCount
+                             indexType:MTLIndexTypeUInt16 indexBuffer:_earthIndices indexBufferOffset:0];
+            [enc setRenderPipelineState:_metalPipeline];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:_arrowIndexCount
+                             indexType:MTLIndexTypeUInt16 indexBuffer:_arrowIndices indexBufferOffset:0];
         }
         [enc endEncoding];
         [cmd presentDrawable:view.currentDrawable];
     }
     [cmd commit];
+    [self placeLabels:view];
 
-    if (!more && !view.paused) { view.paused = YES; _lastTime = 0; }   // idle: stop the display-link
+    if (!more && !view.paused) { view.paused = YES; _lastTime = 0; }
 }
 
 @end

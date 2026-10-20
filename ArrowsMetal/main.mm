@@ -1,7 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import "AppDelegate.h"
 
-static AppDelegate *gDelegate;   // NSApplication holds its delegate weakly
+static AppDelegate *gDelegate;
 
 int main(int argc, const char *argv[]) {
     (void)argc; (void)argv;

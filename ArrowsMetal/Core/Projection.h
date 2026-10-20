@@ -1,4 +1,3 @@
-// Camera matrices built only from CVector / CMatrix.
 #ifndef ARROWS_PROJECTION_H
 #define ARROWS_PROJECTION_H
 
@@ -8,7 +7,6 @@ struct ViewBasis {
     CVector<3> right, up, forward;
 };
 
-// Right-handed, camera looks down -Z, Metal clip depth in [0, 1].
 inline CMatrix<4, 4> perspective(double fovyRadians, double aspect, double zNear, double zFar) {
     double f = 1.0 / std::tan(fovyRadians * 0.5);
     double d = zNear - zFar;
@@ -18,8 +16,6 @@ inline CMatrix<4, 4> perspective(double fovyRadians, double aspect, double zNear
                          CVector<4>(0.0,        0.0, -1.0,      0.0));
 }
 
-// Each row of the view matrix is a basis vector padded with its translation:
-// CVector<3>::resized<4>(pad) does exactly that in one call.
 inline CMatrix<4, 4> lookAt(const CVector<3>& eye, const CVector<3>& target,
                             const CVector<3>& upHint, ViewBasis* basis = 0) {
     CVector<3> f = (target - eye).normalized();
@@ -32,7 +28,6 @@ inline CMatrix<4, 4> lookAt(const CVector<3>& eye, const CVector<3>& target,
                          CVector<4>(0.0, 0.0, 0.0, 1.0));
 }
 
-// CMatrix is row-of-CVector, double; the GPU wants 16 column-major floats.
 inline void toColumnMajor(const CMatrix<4, 4>& m, float out[16]) {
     for (int c = 0; c < 4; ++c)
         for (int r = 0; r < 4; ++r)

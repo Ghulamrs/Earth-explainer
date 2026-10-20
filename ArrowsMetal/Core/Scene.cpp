@@ -1,13 +1,18 @@
 #include "Scene.h"
+#include "ArrowMesh.h"
 
 const double Scene::kRotateSpeed  = 1.6;
 const double Scene::kMoveSpeed    = 1.5;
 const double Scene::kMorphSeconds = 0.6;
+const double Scene::kEarthRadius   = 1.0;
+const double Scene::kLabelDistance = ArrowShape().totalLength() + 0.22;
+
+static const CVector<3> kViewerUp(1, 0, 0);
 
 Scene::Scene()
     : solid_(false), local_(false), morph_(0.0),
-      distance_(6.5), aspect_(1.0),
-      viewDir_(CVector<3>(1.0, 0.75, 1.3).normalized()) {
+      distance_(7.5), aspect_(1.0),
+      viewDir_(CVector<3>(0.35, -0.40, -1.0).normalized()) {
     clearControls();
     rebuildCamera();
 }
@@ -18,7 +23,7 @@ void Scene::clearControls() {
 
 void Scene::reset() {
     model_.reset();
-    distance_ = 6.5;
+    distance_ = 7.5;
     rebuildCamera();
 }
 
@@ -37,13 +42,11 @@ void Scene::setAspect(double aspect) {
 
 void Scene::rebuildCamera() {
     eye_ = viewDir_ * distance_;
-    CMatrix<4, 4> V = lookAt(eye_, CVector<3>(), CVector<3>(0, 1, 0), &basis_);
+    CMatrix<4, 4> V = lookAt(eye_, CVector<3>(), kViewerUp, &basis_);
     CMatrix<4, 4> P = perspective(45.0 * 3.14159265358979323846 / 180.0, aspect_, 0.1, 100.0);
     viewProj_ = P * V;
 }
 
-// Mouse drag = rotation about an arbitrary axis lying in the screen plane,
-// perpendicular to the drag direction (a virtual trackball).
 void Scene::dragRotate(double dx, double dyUp) {
     CVector<3> axis = basis_.right * (-dyUp) + basis_.up * dx;
     double len = axis.length();
@@ -52,7 +55,6 @@ void Scene::dragRotate(double dx, double dyUp) {
 }
 
 bool Scene::update(double dt) {
-    // Any combination of held rotate keys yields one axis: e.g. X+Y -> (1,1,0).
     CVector<3> spin(axisInput(controls_[RotXPos], controls_[RotXNeg]),
                     axisInput(controls_[RotYPos], controls_[RotYNeg]),
                     axisInput(controls_[RotZPos], controls_[RotZNeg]));
@@ -82,4 +84,31 @@ bool Scene::needsFrames() const {
     for (int i = 0; i < ControlCount; ++i)
         if (controls_[i]) return true;
     return morph_ != (solid_ ? 1.0 : 0.0);
+}
+
+AxisLabel Scene::projectAxisLabel(int axis, double w, double h, bool earthOpaque) const {
+    AxisLabel out = { 0.0, 0.0, false, false };
+    CMatrix<4, 4> M = model_.matrix();
+    CVector<4> world4 = M * (CVector<3>::unit(axis) * kLabelDistance).resized<4>(1.0);
+    CVector<3> world  = world4.head<3>();
+
+    CVector<4> clip = viewProj_ * world4;
+    if (clip[3] <= 1e-9) return out;
+    out.visible = true;
+    out.x = (clip[0] / clip[3] + 1.0) * 0.5 * w;
+    out.y = (clip[1] / clip[3] + 1.0) * 0.5 * h;
+
+    if (earthOpaque) {
+        CVector<3> d = world - eye_;
+        double len = d.length();
+        CVector<3> dir = d / len;
+        CVector<3> oc  = eye_ - model_.position;
+        double b    = oc.dot(dir);
+        double disc = b * b - (oc.lengthSquared() - kEarthRadius * kEarthRadius);
+        if (disc > 0.0) {
+            double t = -b - std::sqrt(disc);
+            out.occluded = t > 0.0 && t < len;
+        }
+    }
+    return out;
 }

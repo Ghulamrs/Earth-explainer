@@ -34,7 +34,7 @@ static NSTextField *label(NSString *text, CGFloat size, NSColor *color) {
                                           styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                                                     NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable
                                             backing:NSBackingStoreBuffered defer:NO];
-    _window.title = @"Arrows — CVector / CMatrix / CQuat on Metal";
+    _window.title = @"Earth Explainer — CVector / CMatrix / CQuat on Metal";
     [_window center];
     _window.delegate = self;
 
@@ -51,8 +51,7 @@ static NSTextField *label(NSString *text, CGFloat size, NSColor *color) {
     _view.renderer = _renderer;
     _window.contentView = _view;
 
-    // HUD: updated only when the mode changes, never per frame.
-    NSColor *dim = [NSColor colorWithWhite:0.75 alpha:1.0];
+    NSColor *dim = [NSColor colorWithWhite:0.92 alpha:1.0];
     _status = label(_renderer.statusText, 13, NSColor.whiteColor);
     NSTextField *help = label(@"Enter  wireframe ⇄ solid metal\n"
                               @"Q/A  W/S  E/D   rotate ±X ±Y ±Z  (hold several to combine)\n"
@@ -68,6 +67,21 @@ static NSTextField *label(NSString *text, CGFloat size, NSColor *color) {
         [help.leadingAnchor    constraintEqualToAnchor:_view.leadingAnchor constant:14],
         [help.bottomAnchor     constraintEqualToAnchor:_view.bottomAnchor  constant:-12],
     ]];
+    NSArray<NSString *> *names = @[ @"X", @"Y", @"Z" ];
+    NSArray<NSColor *> *colors = @[ [NSColor colorWithSRGBRed:0.95 green:0.15 blue:0.12 alpha:1],
+                                    [NSColor colorWithSRGBRed:0.20 green:0.85 blue:0.25 alpha:1],
+                                    NSColor.blackColor ];
+    NSMutableArray<NSView *> *axisLabels = [NSMutableArray array];
+    for (NSUInteger i = 0; i < 3; ++i) {
+        NSTextField *t = [NSTextField labelWithString:names[i]];
+        t.font = [NSFont systemFontOfSize:22 weight:NSFontWeightBold];
+        t.textColor = colors[i];
+        [t sizeToFit];
+        [_view addSubview:t];
+        [axisLabels addObject:t];
+    }
+    [_renderer setAxisLabels:axisLabels];
+
     __weak NSTextField *weakStatus = _status;
     _renderer.statusChanged = ^(NSString *text) { weakStatus.stringValue = text; };
 
@@ -77,7 +91,6 @@ static NSTextField *label(NSString *text, CGFloat size, NSColor *color) {
     else [NSApp activateIgnoringOtherApps:YES];
 }
 
-// Cmd-Tab away with a key held would otherwise leave it "down" forever.
 - (void)windowDidResignKey:(NSNotification *)note { [_renderer clearControls]; }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app { return YES; }
